@@ -10,7 +10,7 @@ import java.io.IOException
 import java.io.OutputStream
 import java.util.*
 
-class PrinterConnection(private val device: BluetoothDevice) {
+class PrinterConnection(val device: BluetoothDevice) {
 
     private var socket: BluetoothSocket? = null
     private var outputStream: OutputStream? = null
@@ -27,7 +27,8 @@ class PrinterConnection(private val device: BluetoothDevice) {
             socket?.connect()
             outputStream = socket?.outputStream
             true
-        } catch (e: IOException) {
+        } catch (e: Exception) {
+            // IOException, or SecurityException when BLUETOOTH_CONNECT is revoked
             Log.e(TAG, "Connection failed", e)
             close()
             false
@@ -36,10 +37,11 @@ class PrinterConnection(private val device: BluetoothDevice) {
 
     suspend fun sendData(data: ByteArray): Boolean = withContext(Dispatchers.IO) {
         try {
-            outputStream?.write(data)
-            outputStream?.flush()
+            val out = outputStream ?: return@withContext false
+            out.write(data)
+            out.flush()
             true
-        } catch (e: IOException) {
+        } catch (e: Exception) {
             Log.e(TAG, "Failed to send data", e)
             false
         }

@@ -6,7 +6,8 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class PrinterManager private constructor(private val context: Context) {
 
@@ -14,6 +15,8 @@ class PrinterManager private constructor(private val context: Context) {
         context.getSharedPreferences("PrinterPrefs", Context.MODE_PRIVATE)
 
     private var connection: PrinterConnection? = null
+    // Serializes jobs from HTTP, broadcast and UI so receipts never interleave
+    private val printMutex = Mutex()
     private val bluetoothAdapter: BluetoothAdapter? by lazy {
         val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothManager.adapter
@@ -45,41 +48,41 @@ class PrinterManager private constructor(private val context: Context) {
 
     @SuppressLint("MissingPermission")
     suspend fun print(data: ByteArray, callback: (Boolean, String?) -> Unit) {
-        val address = getSavedPrinterAddress()
-        if (address == null) {
-            callback(false, "No printer selected")
-            return
-        }
+        val error = printMutex.withLock { printLocked(data) }
+        callback(error == null, error)
+    }
 
-        val device: BluetoothDevice? = try {
+    @SuppressLint("MissingPermission")
+    private suspend fun printLocked(data: ByteArray): String? {
+        val address = getSavedPrinterAddress() ?: return "No printer selected"
+
+        val device: BluetoothDevice = try {
             bluetoothAdapter?.getRemoteDevice(address)
         } catch (e: Exception) {
             null
-        }
+        } ?: return "Printer device not found"
 
-        if (device == null) {
-            callback(false, "Printer device not found")
-            return
-        }
+        if (bluetoothAdapter?.isEnabled != true) return "Bluetooth is off"
 
-        if (connection == null || !connection!!.isConnected()) {
-            connection?.close()
-            connection = PrinterConnection(device)
-            if (!connection!!.connect()) {
-                callback(false, "Failed to connect to printer")
-                return
+        // A cached socket can look connected after the printer was power-cycled,
+        // so on a failed write reconnect once and retry.
+        repeat(2) { attempt ->
+            val conn0 = connection
+            // Also reconnect when the user picked a different printer since the last job
+            if (attempt > 0 || conn0?.isConnected() != true || conn0.device.address != address) {
+                closeConnection()
+                // Ongoing discovery makes RFCOMM connect slow or fail
+                try { bluetoothAdapter?.cancelDiscovery() } catch (_: SecurityException) {}
+                val conn = PrinterConnection(device)
+                if (!conn.connect()) return "Failed to connect to printer"
+                connection = conn
             }
+            if (connection?.sendData(data) == true) return null
         }
-
-        val success = connection!!.sendData(data)
-        if (success) {
-            callback(true, null)
-        } else {
-            connection?.close()
-            callback(false, "Failed to send data")
-        }
+        closeConnection()
+        return "Failed to send data"
     }
-    
+
     fun closeConnection() {
         connection?.close()
         connection = null
