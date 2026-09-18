@@ -9,7 +9,7 @@ Aplikasi ini adalah printer bridge seperti RAWBT, khusus untuk printer thermal B
 Aplikasi harus:
 - Connect ke printer thermal Bluetooth Classic (SPP UUID)
 - Support ESC/POS lengkap
-- Bisa menerima perintah print dari aplikasi lain (React Native)
+- Bisa menerima perintah print dari aplikasi lain
 - Bisa install sebagai APK (tanpa Play Store)
 - Stabil untuk aplikasi kasir offline
 
@@ -77,7 +77,7 @@ ESC a (align)
 
 ---
 
-# 🔹 3. Intent API (Untuk React Native)
+# 🔹 3. Intent API
 
 Buat BroadcastReceiver atau Activity yang menerima intent:
 
@@ -184,5 +184,5 @@ Printer generic 58mm / 80mm ESC/POS thermal Bluetooth dari marketplace.
 
 Goal akhir:
 APK bisa diinstall.
-React Native bisa kirim intent untuk print.
+Aplikasi lain bisa kirim intent untuk print.
 App stabil untuk aplikasi kasir produksi.
