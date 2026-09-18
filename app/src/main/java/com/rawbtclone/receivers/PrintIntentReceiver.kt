@@ -4,8 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import com.rawbtclone.bluetooth.PrinterManager
 import com.rawbtclone.utils.EscPosBuilder
 import com.rawbtclone.utils.JsonPrintParser
@@ -32,11 +30,18 @@ class PrintIntentReceiver : BroadcastReceiver() {
 
                 val printData = builder.feed(3).cut().build()
                 
-                CoroutineScope(Dispatchers.Main).launch {
-                    printerManager.print(printData) { success, error ->
-                        if (!success) {
-                            Log.e("PrintIntentReceiver", "Print failed: $error")
+                // Keep the process alive until the print finishes; onReceive returning
+                // alone lets the system kill it mid-job.
+                val pending = goAsync()
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        printerManager.print(printData) { success, error ->
+                            if (!success) {
+                                Log.e("PrintIntentReceiver", "Print failed: $error")
+                            }
                         }
+                    } finally {
+                        pending.finish()
                     }
                 }
             } catch (e: Exception) {
