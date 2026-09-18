@@ -54,6 +54,7 @@ class MainActivity : AppCompatActivity() {
     private var devicesList: List<BluetoothDevice> = emptyList()
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private val discoveredDevices = mutableListOf<BluetoothDevice>()
+    private var receiverRegistered = false
 
     private val bluetoothReceiver = object : BroadcastReceiver() {
         @SuppressLint("MissingPermission")
@@ -94,6 +95,7 @@ class MainActivity : AppCompatActivity() {
         val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
         registerReceiver(bluetoothReceiver, filter)
+        receiverRegistered = true
 
         tvStatus = findViewById(R.id.tvStatus)
         lvDevices = findViewById(R.id.lvDevices)
@@ -298,7 +300,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        unregisterReceiver(bluetoothReceiver)
-        bluetoothDiscoveryManager.stopDiscovery()
+        // onCreate may finish() early (no Bluetooth) before the receiver is registered
+        if (receiverRegistered) unregisterReceiver(bluetoothReceiver)
+        if (::bluetoothDiscoveryManager.isInitialized && checkPermissions()) {
+            bluetoothDiscoveryManager.stopDiscovery()
+        }
     }
 }
