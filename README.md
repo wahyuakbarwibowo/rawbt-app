@@ -93,6 +93,11 @@ The app runs a local HTTP server in the background. You can send a POST request 
 -   **Method**: `POST`
 -   **Headers**: `Content-Type: application/json`
 -   **Body**: JSON array of command objects (see format below)
+-   **Response**: sent after the printer finishes, so it reflects the real result
+    -   `200` `{"status":"success"}`
+    -   `400` `{"status":"error","message":"..."}` for invalid JSON or request
+    -   `500` `{"status":"error","message":"..."}` when printing failed (no printer selected, Bluetooth off, printer unreachable)
+-   The server only accepts connections from the same device (loopback).
 
 #### JSON Command Format
 
